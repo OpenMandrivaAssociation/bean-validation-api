@@ -7,7 +7,7 @@ Version:          1.1.0
 Release:          1.0%{?dist}
 Summary:          Bean Validation API (JSR 349)
 License:          ASL 2.0
-URL:              http://beanvalidation.org/
+URL:              https://beanvalidation.org/
 Source0:          https://github.com/beanvalidation/beanvalidation-api/archive/%{namedversion}.tar.gz
 
 BuildRequires:    java-devel
