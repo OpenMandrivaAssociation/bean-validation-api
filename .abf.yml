@@ -1,2 +1,4 @@
+removed_sources:
+  1.1.0.Final.tar.gz: 9475082a4bcfd05e623a001348bd396b439e61e0
 sources:
-  "1.1.0.Final.tar.gz": 9475082a4bcfd05e623a001348bd396b439e61e0
+  validation-api-2.0.1.Final.tar.gz: d209d338502bb8c1e0e227e053bf90886734c31c

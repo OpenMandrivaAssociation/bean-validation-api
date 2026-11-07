@@ -1,85 +1,109 @@
-%{?_javapackages_macros:%_javapackages_macros}
-%global namedreltag .Final
-%global namedversion %{version}%{?namedreltag}
+Name:		bean-validation-api
+Version:	2.0.1.Final
+Release:	1
+Summary:	Bean Validation API
+Group:		Development/Java
+License:	ASL 2.0
+URL:		https://beanvalidation.org/
+Source0:	https://github.com/jakartaee/validation/archive/refs/tags/%{version}.tar.gz#/validation-api-%{version}.tar.gz
 
-Name:             bean-validation-api
-Version:          1.1.0
-Release:          1.0%{?dist}
-Summary:          Bean Validation API (JSR 349)
-License:          ASL 2.0
-URL:              https://beanvalidation.org/
-Source0:          https://github.com/beanvalidation/beanvalidation-api/archive/%{namedversion}.tar.gz
+BuildArch:	noarch
+BuildRequires:	python
+# Literal, so the first rpmbuild -bs records them before sysjar is installed.
+BuildRequires:	maven
+BuildRequires:	java-current-devel
+BuildSystem:	maven
+BuildOption(install):	--file-name validation-api --link %{name}
 
-BuildRequires:    java-devel
-
-# test deps
-BuildRequires:    mvn(org.testng:testng)
-
-BuildRequires:    maven-local
-BuildRequires:    maven-plugin-bundle
-BuildRequires:    maven-surefire-provider-testng
-
-BuildArch:        noarch
+Obsoletes:	%{name}-javadoc < %{version}-%{release}
 
 %description
-This package contains Bean Validation (JSR-349) API.
-
-%package javadoc
-Summary:          Javadoc for %{name}
-
-%description javadoc
-This package contains the API documentation for %{name}.
+Bean Validation is the API for declaring constraints on Java objects.
+2.0.1.Final is the last release of javax.validation:validation-api.
+The automatic module name stays java.validation. Tests are skipped.
 
 %prep
-%setup -q -n beanvalidation-api-%{namedversion}
+%autosetup -n validation-%{version}
+python - <<'PY'
+from pathlib import Path
 
-# Disable javadoc jar
-%pom_xpath_remove "pom:build/pom:plugins/pom:plugin[pom:artifactId='maven-javadoc-plugin']/pom:executions"
-# Disable source jar
-%pom_remove_plugin :maven-source-plugin
+java_files = list(Path("src/main/java").rglob("*.java"))
+if len(java_files) != 97:
+    raise SystemExit("java files " + str(len(java_files)))
+Path("pom.xml").write_text("""<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>javax.validation</groupId>
+  <artifactId>validation-api</artifactId>
+  <version>%{version}</version>
+  <packaging>jar</packaging>
+  <name>Bean Validation API</name>
+  <description>Bean Validation API</description>
+  <url>https://beanvalidation.org/</url>
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+    </license>
+  </licenses>
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.source>1.8</maven.compiler.source>
+    <maven.compiler.target>1.8</maven.compiler.target>
+  </properties>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.12.1</version>
+        <configuration>
+          <source>1.8</source>
+          <target>1.8</target>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.3.0</version>
+        <configuration>
+          <archive>
+            <manifestEntries>
+              <Automatic-Module-Name>java.validation</Automatic-Module-Name>
+            </manifestEntries>
+          </archive>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
+""", encoding="utf-8")
+pom = Path("pom.xml").read_text(encoding="utf-8")
+for needle in (
+    "<artifactId>validation-api</artifactId>",
+    "<version>%{version}</version>",
+    "<source>1.8</source>",
+    "<target>1.8</target>",
+    "java.validation",
+):
+    if needle not in pom:
+        raise SystemExit("pom missing " + needle)
+for needle in ("testng", "maven-bundle-plugin", "SNAPSHOT", "<release>", "jakarta.validation"):
+    if needle in pom:
+        raise SystemExit("pom still contains " + needle)
+if list(Path(".").rglob("*.jar")):
+    raise SystemExit("prebuilt jar remains")
+PY
 
-%build
-
-%mvn_file : %{name}
-%mvn_build
-
-%install
-%mvn_install
+%build -a
+cat > manifest-addition <<'EOF'
+Automatic-Module-Name: java.validation
+EOF
+jar ufm target/validation-api-%{version}.jar manifest-addition
+java --module-path target/validation-api-%{version}.jar --describe-module java.validation > module-describe.txt
+# A versioned jar prints "name@version ... automatic", not "name automatic".
+grep -q '^java.validation' module-describe.txt || { cat module-describe.txt; exit 1; }
+grep -q ' automatic$' module-describe.txt || { cat module-describe.txt; exit 1; }
 
 %files -f .mfiles
-%doc license.txt
-
-%files javadoc -f .mfiles-javadoc
-%doc license.txt
-
-%changelog
-* Wed Jul 24 2013 gil cattaneo <puntogil@libero.it> 1.1.0-1
-- update to 1.1.0.Final
-- adapt to current guideline
-- resolve rpmlint warning
-
-* Thu Feb 14 2013 Marek Goldmann <mgoldman@redhat.com> - 1.0.0-8
-- Fixed build issue
-
-* Wed Feb 13 2013 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.0.0-7
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_19_Mass_Rebuild
-
-* Wed Feb 06 2013 Java SIG <java-devel@lists.fedoraproject.org> - 1.0.0-6
-- Update for https://fedoraproject.org/wiki/Fedora_19_Maven_Rebuild
-- Replace maven BuildRequires with maven-local
-
-* Wed Jul 18 2012 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.0.0-5
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_18_Mass_Rebuild
-
-* Fri Mar 09 2012 Marek Goldmann <mgoldman@redhat.com> 1.0.0-4
-- Relocated jars to _javadir
-
-* Thu Jan 12 2012 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.0.0-3
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_17_Mass_Rebuild
-
-* Mon Aug 29 2011 Marek Goldmann <mgoldman@redhat.com> 1.0.0-2
-- Added license file to distribution
-
-* Tue Aug 16 2011 Marek Goldmann <mgoldman@redhat.com> 1.0.0-1
-- Initial packaging
-
+%doc README.md license.txt
